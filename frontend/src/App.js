@@ -12,7 +12,8 @@ import './App.css';
 // Constants & Configuration
 // ---------------------------------------------------------------------------
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_HOST = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = `${API_HOST}/api`;
 
 const CLASSIFICATION_CONFIG = {
   'Unplanned Industrial Fire': {
@@ -141,7 +142,7 @@ function App() {
       console.error('Error fetching thermal points/stats:', err);
       setError(
         err.response?.data?.detail ||
-          'Failed to connect to FastAPI backend at http://localhost:8000. Ensure the server is running.'
+          `Failed to connect to FastAPI backend at ${API_HOST}. Ensure the server is running.`
       );
     }
   }, [selectedHours]);
