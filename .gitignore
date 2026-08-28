@@ -3,6 +3,7 @@
 
 # Dependencies
 node_modules/
+india-260823.osm.pbf
 
 # Python
 __pycache__/
