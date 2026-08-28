@@ -4,6 +4,12 @@ An end-to-end near-real-time thermal detection and ML-based flare monitoring sys
 
 ---
 
+## 🔗 Live Demo
+
+**[View the live dashboard →](https://sih-26162-ai-based-detection-and-cl.vercel.app/)**
+
+---
+
 ## Architecture Overview
 
 ```
@@ -90,6 +96,19 @@ npx serve -s build
 
 ---
 
+## 🚀 Deployment
+
+This project is deployed using:
+- **Frontend**: [Vercel](https://vercel.com) — auto-deployed from the `frontend/` directory on every push to `main`
+- **Backend API**: [Render](https://render.com) — FastAPI web service auto-deployed from the `backend/` directory
+- **Database**: [Render PostgreSQL](https://render.com) with the PostGIS extension enabled, seeded from `seed_data.sql`
+
+Live URLs:
+- Frontend: https://sih-26162-ai-based-detection-and-cl.vercel.app/
+- Backend API: https://sih26162-ai-based-detection-and.onrender.com
+
+---
+
 ## Pre-loaded Dataset
 
 The container setup includes `seed_data.sql`, which pre-loads **~124,000 processed thermal detection points** into PostgreSQL on first container start. This ensures the FastAPI endpoints and React dashboard function immediately with rich historical thermal points without needing to run the full data pipeline first.
@@ -107,6 +126,6 @@ The container setup includes `seed_data.sql`, which pre-loads **~124,000 process
 
 <!-- Screenshots placeholder - add your screenshots below -->
 ```markdown
-![Dashboard View](path/to/dashboard_screenshot.png)
-![Interactive Map](path/to/map_screenshot.png)
+![Dashboard View](./assets/dashboard.png)
+![Map View](./assets/map.png)
 ```
