@@ -124,3 +124,16 @@ Wildfire / Other Biomass Burning       1.00      1.00      1.00     20691
 ==========================================
  Pipeline complete: 2026-08-26 12:03:27
 ==========================================
+==========================================
+ Starting ML Data Pipeline: 2026-08-28 18:00:01
+==========================================
+[INFO] Activating virtual environment at /home/kumar/sih_venv/bin/activate...
+[INFO] Working directory: /mnt/c/Users/kumar/OneDrive/Documents/SIH_2026
+
+=== Step 1: FIRMS Ingestion ===
+[FIRMS] Fetching: https://firms.modaps.eosdis.nasa.gov/api/area/csv/efb5be522f023f6ec72fd5740850b552/VIIRS_SNPP_NRT/68.1,6.7,97.4,35.5/5
+[FIRMS] Received 589 record(s) from API.
+[DB] Connecting to sih_fire_db on localhost:5432 ...
+[ERROR] Could not connect to the database: connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
