@@ -1,0 +1,126 @@
+==========================================
+ Starting ML Data Pipeline: 2026-08-26 00:00:02
+==========================================
+[INFO] Activating virtual environment at /home/kumar/sih_venv/bin/activate...
+[INFO] Working directory: /mnt/c/Users/kumar/OneDrive/Documents/SIH_2026
+
+=== Step 1: FIRMS Ingestion ===
+[FIRMS] Fetching: https://firms.modaps.eosdis.nasa.gov/api/area/csv/efb5be522f023f6ec72fd5740850b552/VIIRS_SNPP_NRT/68.1,6.7,97.4,35.5/5
+[FIRMS] Received 681 record(s) from API.
+[DB] Connecting to sih_fire_db on 172.19.96.1:5432 ...
+Traceback (most recent call last):
+  File "/mnt/c/Users/kumar/OneDrive/Documents/SIH_2026/fetch_firms.py", line 234, in main
+    inserted, skipped = insert_rows(cur, rows)
+                        ~~~~~~~~~~~^^^^^^^^^^^
+  File "/mnt/c/Users/kumar/OneDrive/Documents/SIH_2026/fetch_firms.py", line 200, in insert_rows
+    cur.execute(insert_sql, params)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: could not receive data from server: Connection timed out
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/c/Users/kumar/OneDrive/Documents/SIH_2026/fetch_firms.py", line 246, in <module>
+    main()
+    ~~~~^^
+  File "/mnt/c/Users/kumar/OneDrive/Documents/SIH_2026/fetch_firms.py", line 231, in main
+    with conn:
+         ^^^^
+psycopg2.InterfaceError: connection already closed
+==========================================
+ Starting ML Data Pipeline: 2026-08-26 12:00:02
+==========================================
+[INFO] Activating virtual environment at /home/kumar/sih_venv/bin/activate...
+[INFO] Working directory: /mnt/c/Users/kumar/OneDrive/Documents/SIH_2026
+
+=== Step 1: FIRMS Ingestion ===
+[FIRMS] Fetching: https://firms.modaps.eosdis.nasa.gov/api/area/csv/efb5be522f023f6ec72fd5740850b552/VIIRS_SNPP_NRT/68.1,6.7,97.4,35.5/5
+[FIRMS] Received 723 record(s) from API.
+[DB] Connecting to sih_fire_db on 172.19.96.1:5432 ...
+
+-- Ingestion summary ------------------------------------------
+  New points inserted : 79
+  Duplicates skipped  : 644
+---------------------------------------------------------------
+
+=== Step 2: Feature Engineering ===
+[DB] Connecting to sih_fire_db on 172.19.96.1:5432 ...
+[DDL] Feature columns ensured (dist_to_industrial_m, dist_to_powerplant_m, recurrence_count).
+[DDL] Index ensured: idx_thermal_points_geom
+[DDL] Index ensured: idx_power_plants_geom
+[ANALYZE] Running ANALYZE on thermal_points, industrial_zones, power_plants ...
+[ANALYZE] Done in 1.25s.
+[DBSCAN] Computing recurrence counts via ST_ClusterDBSCAN (eps=0.0045, minpoints=2) ...
+[DBSCAN] Done in 4.51s (124070 rows updated).
+[KNN] Computing nearest industrial zone and power plant distances ...
+[KNN] Done in 51.66s (124070 rows updated).
+
+-- Feature build summary --------------------------------------
+  Rows updated       : 124070
+  ANALYZE time       : 1.25s
+  DBSCAN cluster time: 4.51s (recurrence_count)
+  KNN distance time  : 51.66s (dist_to_industrial, dist_to_powerplant)
+  Total pipeline time: 57.42s
+---------------------------------------------------------------
+
+=== Step 3: Train Classifier ===
+===============================================================
+  train_classifier.py  --  SIH Fire Source Classifier
+===============================================================
+
+[DB] Connecting to sih_fire_db on 172.19.96.1:5432 ...
+[DATA] Loaded 124070 rows from thermal_points.
+
+[LABELS] Class distribution (rule-based):
+  Wildfire / Other Biomass Burning         111179 rows
+  Persistent Industrial Source              8218 rows
+  Unplanned Industrial Fire                 4673 rows
+
+[SPLIT] Temporal Train/Test Split (80/20 Chronological):
+  Train set : 99256 rows  |  Period: 2026-04-30 to 2026-06-06
+  Test set  : 24814 rows  |  Period: 2026-06-06 to 2026-08-26
+
+[TRAIN] Fitting RandomForestClassifier (n_estimators=200, random_state=42) ...
+[TRAIN] Done.
+
+[EVAL] Classification report on held-out test set:
+---------------------------------------------------------------
+                                  precision    recall  f1-score   support
+
+    Persistent Industrial Source       1.00      1.00      1.00      3265
+       Unplanned Industrial Fire       1.00      1.00      1.00       858
+Wildfire / Other Biomass Burning       1.00      1.00      1.00     20691
+
+                        accuracy                           1.00     24814
+                       macro avg       1.00      1.00      1.00     24814
+                    weighted avg       1.00      1.00      1.00     24814
+
+[IMPORTANCE] Feature importances (descending):
+  dist_to_industrial_m         0.7271  #############################
+  recurrence_count             0.1867  #######
+  dist_to_powerplant_m         0.0577  ##
+  hour_of_day                  0.0114  
+  is_night                     0.0103  
+  frp                          0.0053  
+  confidence                   0.0007  
+  month                        0.0006  
+  brightness                   0.0000  
+  satellite_encoded            0.0000  
+
+[MODEL] Saved to '/mnt/c/Users/kumar/OneDrive/Documents/SIH_2026/model.pkl'
+
+[DB] Predicting all rows, computing confidence scores and review flags ...
+[DB] Wrote classification, confidence scores, and review flags for 124070 rows.
+
+===============================================================
+  Classification & Confidence Scoring Complete
+===============================================================
+  Total rows evaluated         : 124070
+  Average confidence score     : 0.9983 (99.8%)
+  Flagged for review (< 0.70)  : 17 rows (0.0%)
+===============================================================
+
+==========================================
+ Pipeline complete: 2026-08-26 12:03:27
+==========================================
