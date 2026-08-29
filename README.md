@@ -124,8 +124,6 @@ The container setup includes `seed_data.sql`, which pre-loads **~124,000 process
 
 ## Screenshots
 
-<!-- Screenshots placeholder - add your screenshots below -->
-```markdown
+markdown
 ![Dashboard View](./assets/dashboard.png)
 ![Map View](./assets/map.png)
-```
