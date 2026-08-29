@@ -1,20 +1,22 @@
 # AI-Based Detection & Classification of Industrial Fires & Flares (SIH 26162)
 
-[![Live Demo](https://img.shields.io/badge/Demo-Live%20Frontend-brightgreen?style=flat-square&logo=vercel)](https://sih-26162-ai-based-detection-and-cl.vercel.app/)
-[![Backend API](https://img.shields.io/badge/API-Render%20FastAPI-blue?style=flat-square&logo=fastapi)](https://sih26162-ai-based-detection-and.onrender.com/docs)
-[![PostGIS Database](https://img.shields.io/badge/Database-PostgreSQL%20%2F%20PostGIS-336791?style=flat-square&logo=postgresql)](https://render.com)
+<div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 10px;">
+  <a href="https://sih-26162-ai-based-detection-and-cl.vercel.app/"><img src="https://img.shields.io/badge/Demo-Live%20Frontend-brightgreen?style=flat-square&logo=vercel" alt="Live Demo"></a>
+  <a href="https://sih26162-ai-based-detection-and.onrender.com/docs"><img src="https://img.shields.io/badge/API-Render%20FastAPI-blue?style=flat-square&logo=fastapi" alt="Backend API"></a>
+  <a href="https://render.com"><img src="https://img.shields.io/badge/Database-PostgreSQL%20%2F%20PostGIS-336791?style=flat-square&logo=postgresql" alt="PostGIS Database"></a>
+</div>
 
 An end-to-end, near-real-time satellite thermal monitoring and machine learning classification platform for industrial fire safety across India. The system ingests thermal hotspot data from NASA FIRMS (VIIRS_SNPP), enriches each detection with high-performance PostGIS spatial geospatial features (proximity to industrial zones and power plants, plus spatial DBSCAN recurrence), classifies thermal signatures via a Random Forest model into **persistent industrial flares**, **unplanned industrial fires**, or **wildfires/biomass burning**, and visualizes them on an interactive React + Leaflet intelligence dashboard powered by a high-throughput FastAPI backend.
 
 ---
 
-## ⚡ How It Works (15-Second Overview)
+## ⚡ How It Works
 
-- **🛰️ Satellite Ingestion**: Continuously ingests Near-Real-Time (NRT) thermal radiation data for India from the NASA FIRMS VIIRS 375m sensor.
-- **🗺️ Spatial Feature Engine**: Enriches thermal detections in PostgreSQL/PostGIS by computing KNN distances to 4,000+ industrial zones, 350+ power plants, and spatio-temporal DBSCAN cluster recurrence.
-- **🤖 ML Classification**: A Random Forest classifier categorizes detections into *Industrial Flares*, *Unplanned Industrial Fires*, or *Wildfires / Biomass Burning*.
-- **🚩 Human-in-the-Loop Triage**: Probabilistic confidence scoring flags ambiguous boundary detections (`confidence < 0.70`) with a `needs_review` indicator for manual safety verification.
-- **📊 Interactive Web Dashboard**: Serves GeoJSON layers, live clustering, temporal playback, and risk analytics via FastAPI to a React & Leaflet frontend.
+- **Satellite Ingestion**: Continuously ingests Near-Real-Time (NRT) thermal radiation data for India from the NASA FIRMS VIIRS 375m sensor.
+- **Spatial Feature Engine**: Enriches thermal detections in PostgreSQL/PostGIS by computing KNN distances to 4,000+ industrial zones, 350+ power plants, and spatio-temporal DBSCAN cluster recurrence.
+- **ML Classification**: A Random Forest classifier categorizes detections into *Industrial Flares*, *Unplanned Industrial Fires*, or *Wildfires / Biomass Burning*.
+- **Human-in-the-Loop Triage**: Probabilistic confidence scoring flags ambiguous boundary detections (`confidence < 0.70`) with a `needs_review` indicator for manual safety verification.
+- **Interactive Web Dashboard**: Serves GeoJSON layers, live clustering, temporal playback, and risk analytics via FastAPI to a React & Leaflet frontend.
 
 ---
 
