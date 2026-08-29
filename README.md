@@ -133,5 +133,7 @@ The container setup includes `seed_data.sql`, which pre-loads **~124,000 process
 
 Markdown
 
-<img src="./assets/dashboard.png" alt="Dashboard" width="500">
-<img src="./assets/map.png" alt="Map View" width="50%">
+<p align="center">
+  <img src="assets/dashboard.png" width="500" alt="Dashboard" />
+</p>
+<img src="./assets/map.png" alt="Map View" width="100%">
