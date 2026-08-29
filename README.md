@@ -136,4 +136,8 @@ Markdown
 <p align="center">
   <img src="assets/dashboard.png" width="500" alt="Dashboard" />
 </p>
+<<<<<<< HEAD
 <img src="./assets/map.png" alt="Map View" width="100%">
+=======
+<img src="./assets/map.png" alt="Map View" width="100%">
+>>>>>>> d5a9e62df32ace331cb4874921bbd3ab26f7bb88
