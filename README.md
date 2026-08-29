@@ -68,6 +68,13 @@ DB_PASSWORD=your_postgres_password_here
 DB_HOST=localhost
 BBOX=68.1,6.7,97.4,35.5
 ```
+---
+
+## 🔗 NASA FIRMS FREE API 
+
+**[NASA FIRMS FREE API →](https://firms.modaps.eosdis.nasa.gov/api/map_key/)**
+
+---
 
 ### 3. Start Database Container
 Launch the PostGIS database container using Docker Compose:
@@ -124,8 +131,7 @@ The container setup includes `seed_data.sql`, which pre-loads **~124,000 process
 
 ## Screenshots
 
-<!-- Screenshots placeholder - add your screenshots below -->
-```markdown
-![Dashboard View](./assets/dashboard.png)
-![Map View](./assets/map.png)
-```
+Markdown
+
+<img src="./assets/dashboard.png" alt="Dashboard" width="500">
+<img src="./assets/map.png" alt="Map View" width="50%">
