@@ -38,14 +38,14 @@ An end-to-end, near-real-time satellite thermal monitoring and machine learning 
                                       v
  +-------------------------------------------------------------------------+
  |                 PostgreSQL + PostGIS Database Engine                    |
- |   - Raw Thermal Hotspots (brightness_temp, FRP, confidence)            |
+ |   - Raw Thermal Hotspots (brightness_temp, FRP, confidence)             |
  |   - Industrial Zone Polygons (OSM Data) & Thermal Power Plants (WRI)    |
  +------------------------------------+------------------------------------+
                                       |
                                       v
  +-------------------------------------------------------------------------+
  |                      Spatial Feature Engineering                        |
- |   - PostGIS KNN ST_Distance (nearest industrial zone & power plant)      |
+ |   - PostGIS KNN ST_Distance (nearest industrial zone & power plant)     |
  |   - Spatio-temporal ST_ClusterDBSCAN recurrence count (eps=0.01)        |
  +------------------------------------+------------------------------------+
                                       |
@@ -59,7 +59,7 @@ An end-to-end, near-real-time satellite thermal monitoring and machine learning 
                                       v
  +-------------------------------------------------------------------------+
  |                       FastAPI Backend Service                           |
- |   - High-performance GeoJSON stream endpoints & filtering APIs         |
+ |   - High-performance GeoJSON stream endpoints & filtering APIs          |
  |   - Summary statistics, recurrence metrics, and fire risk aggregates    |
  +------------------------------------+------------------------------------+
                                       |
