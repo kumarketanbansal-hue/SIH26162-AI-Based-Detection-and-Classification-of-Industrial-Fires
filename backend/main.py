@@ -150,7 +150,7 @@ def get_thermal_points(
         """
         params.append(str(effective_hours))
 
-    query += " ORDER BY id DESC LIMIT %s"
+    query += " ORDER BY classification IS NOT NULL DESC, acq_date DESC, acq_time DESC LIMIT %s"
     params.append(limit)
 
     try:
@@ -240,7 +240,7 @@ def get_power_plants():
 @app.get("/api/stats")
 def get_stats():
     """
-    Returns summary statistics: total thermal points, count per classification category, and most recent ingestion timestamp.
+    Returns summary statistics: total thermal points, count per classification category, needs_review count, and most recent ingestion timestamp.
     """
     count_query = "SELECT COUNT(*) AS total FROM thermal_points;"
     class_query = """
@@ -250,6 +250,7 @@ def get_stats():
         FROM thermal_points
         GROUP BY classification;
     """
+    review_query = "SELECT COUNT(*) AS total_needs_review FROM thermal_points WHERE needs_review = TRUE;"
     recent_query = "SELECT MAX(inserted_at) AS most_recent_ingestion FROM thermal_points;"
 
     try:
@@ -264,6 +265,10 @@ def get_stats():
                     row["category"]: row["count"] for row in class_rows
                 }
 
+                cur.execute(review_query)
+                review_row = cur.fetchone()
+                total_needs_review = review_row["total_needs_review"] if review_row else 0
+
                 cur.execute(recent_query)
                 recent_row = cur.fetchone()
                 most_recent_ingestion = (
@@ -275,6 +280,7 @@ def get_stats():
         return {
             "total_thermal_points": total_points,
             "count_per_classification": count_per_classification,
+            "total_needs_review": total_needs_review,
             "most_recent_ingestion": most_recent_ingestion,
         }
     except Exception as exc:

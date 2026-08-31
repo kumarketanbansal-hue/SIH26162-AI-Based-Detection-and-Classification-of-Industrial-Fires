@@ -4,3 +4,4 @@ python-dotenv
 scikit-learn
 pandas
 joblib
+matplotlib

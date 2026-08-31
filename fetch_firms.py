@@ -124,9 +124,15 @@ def get_connection(db_password):
 
 
 def ensure_table(cur):
-    """Create the thermal_points table (and PostGIS extension) if not present."""
+    """Create the thermal_points and india_boundary tables (and PostGIS extension) if not present."""
     cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
     cur.execute(CREATE_TABLE_SQL)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS india_boundary (
+            id   SERIAL PRIMARY KEY,
+            geom GEOMETRY(Geometry, 4326)
+        );
+    """)
 
 
 def safe_float(value):
@@ -139,25 +145,36 @@ def safe_float(value):
 
 def insert_rows(cur, rows):
     """
-    Insert FIRMS rows into thermal_points.
+    Insert FIRMS rows into thermal_points only if they fall inside India's boundary.
 
     Duplicates are identified by (latitude, longitude, acq_date, acq_time).
-    Returns (inserted_count, skipped_count).
+    Returns (inserted_count, duplicate_count, outside_boundary_count).
     """
     inserted = 0
-    skipped  = 0
+    duplicates = 0
+    outside_boundary = 0
 
     insert_sql = """
         INSERT INTO thermal_points
             (latitude, longitude, geom, brightness, frp, confidence,
              acq_date, acq_time, satellite, daynight)
-        VALUES (
-            %(lat)s, %(lon)s,
-            ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326),
+        SELECT
+            %(latitude)s, %(longitude)s,
+            ST_SetSRID(ST_MakePoint(%(longitude)s, %(latitude)s), 4326),
             %(brightness)s, %(frp)s, %(confidence)s,
             %(acq_date)s, %(acq_time)s, %(satellite)s, %(daynight)s
+        WHERE EXISTS (
+            SELECT 1 FROM india_boundary b
+            WHERE ST_Within(ST_SetSRID(ST_MakePoint(%(longitude)s, %(latitude)s), 4326), b.geom)
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (latitude, longitude, acq_date, acq_time) DO NOTHING;
+    """
+
+    boundary_check_sql = """
+        SELECT EXISTS (
+            SELECT 1 FROM india_boundary b
+            WHERE ST_Within(ST_SetSRID(ST_MakePoint(%s, %s), 4326), b.geom)
+        );
     """
 
     # Unique constraint for duplicate detection (created once, idempotently)
@@ -182,12 +199,14 @@ def insert_rows(cur, rows):
 
         if lat is None or lon is None:
             print(f"[WARN] Skipping row with invalid coordinates: {row}")
-            skipped += 1
+            outside_boundary += 1
             continue
 
         params = {
             "lat":        lat,
             "lon":        lon,
+            "latitude":   lat,
+            "longitude":  lon,
             "brightness": safe_float(row.get("brightness")),
             "frp":        safe_float(row.get("frp")),
             "confidence": row.get("confidence", "").strip() or None,
@@ -201,9 +220,15 @@ def insert_rows(cur, rows):
         if cur.rowcount == 1:
             inserted += 1
         else:
-            skipped += 1
+            # Determine if point was skipped for being outside boundary or a duplicate
+            cur.execute(boundary_check_sql, (lon, lat))
+            is_inside = cur.fetchone()[0]
+            if not is_inside:
+                outside_boundary += 1
+            else:
+                duplicates += 1
 
-    return inserted, skipped
+    return inserted, duplicates, outside_boundary
 
 
 # ---------------------------------------------------------------------------
@@ -231,14 +256,15 @@ def main():
     with conn:
         with conn.cursor() as cur:
             ensure_table(cur)
-            inserted, skipped = insert_rows(cur, rows)
+            inserted, duplicates, outside_boundary = insert_rows(cur, rows)
 
     conn.close()
 
     # 4. Summary
     print("\n-- Ingestion summary ------------------------------------------")
-    print(f"  New points inserted : {inserted}")
-    print(f"  Duplicates skipped  : {skipped}")
+    print(f"  New points inserted       : {inserted}")
+    print(f"  Duplicates skipped        : {duplicates}")
+    print(f"  Outside boundary skipped  : {outside_boundary}")
     print("---------------------------------------------------------------")
 
 

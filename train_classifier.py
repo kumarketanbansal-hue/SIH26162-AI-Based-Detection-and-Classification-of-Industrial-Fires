@@ -15,7 +15,12 @@ Environment variables (loaded from .env):
 
 Output files:
     model.pkl    - Trained RandomForestClassifier (scikit-learn, via joblib)
+    plots/       - Generated evaluation plots (.png)
 """
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 import os
 import sys
@@ -27,7 +32,7 @@ import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 
 load_dotenv()
@@ -340,7 +345,103 @@ def main():
     joblib.dump(clf, MODEL_PATH)
     print(f"\n[MODEL] Saved to '{MODEL_PATH}'")
 
-    # 10. Compute predictions, confidence scores, and review flags for ALL rows
+    # 10. Generate and save evaluation plots
+    print("\n[PLOTS] Generating evaluation plots ...")
+    plots_dir = os.path.join(os.path.dirname(__file__), "plots")
+    os.makedirs(plots_dir, exist_ok=True)
+
+    # Plot 1: Feature Importance
+    feat_names = [feat for feat, _ in importances]
+    feat_scores = [score for _, score in importances]
+    plt.figure(figsize=(10, 6))
+    y_pos = np.arange(len(feat_names))
+    plt.barh(y_pos, feat_scores, align="center", color="#3b6998")
+    plt.yticks(y_pos, feat_names)
+    plt.gca().invert_yaxis()
+    plt.xlabel("Importance Score")
+    plt.ylabel("Feature")
+    plt.title("Feature Importance — Random Forest Classifier")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "feature_importance.png"), dpi=150)
+    plt.close()
+    print("[PLOT] Saved plots/feature_importance.png")
+
+    # Plot 2: Confusion Matrix Heatmap
+    classes = [LABEL_PERSISTENT, LABEL_UNPLANNED, LABEL_WILDFIRE]
+    cm = confusion_matrix(y_test, y_pred, labels=classes)
+    plt.figure(figsize=(8, 6))
+    plt.imshow(cm, interpolation="nearest", cmap="Blues")
+    plt.title("Confusion Matrix — Test Set")
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=20, ha="right")
+    plt.yticks(tick_marks, classes)
+    thresh = cm.max() / 2.0 if cm.max() > 0 else 1.0
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            plt.text(
+                j,
+                i,
+                format(cm[i, j], "d"),
+                ha="center",
+                va="center",
+                color="white" if cm[i, j] > thresh else "black",
+            )
+    plt.ylabel("Actual")
+    plt.xlabel("Predicted")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "confusion_matrix.png"), dpi=150)
+    plt.close()
+    print("[PLOT] Saved plots/confusion_matrix.png")
+
+    # Plot 3: Precision / Recall / F1 by Class
+    report_dict = classification_report(y_test, y_pred, output_dict=True)
+    report_classes = [c for c in classes if c in report_dict]
+    precision = [report_dict[c]["precision"] for c in report_classes]
+    recall = [report_dict[c]["recall"] for c in report_classes]
+    f1 = [report_dict[c]["f1-score"] for c in report_classes]
+
+    x = np.arange(len(report_classes))
+    width = 0.25
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(x - width, precision, width, label="Precision", color="#2b5c8f")
+    plt.bar(x, recall, width, label="Recall", color="#e27c38")
+    plt.bar(x + width, f1, width, label="F1-Score", color="#3ca03c")
+    plt.xlabel("Class")
+    plt.ylabel("Score")
+    plt.title("Precision / Recall / F1 by Class")
+    plt.xticks(x, report_classes)
+    plt.ylim(0, 1.05)
+    plt.legend(loc="lower right")
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "precision_recall_f1.png"), dpi=150)
+    plt.close()
+    print("[PLOT] Saved plots/precision_recall_f1.png")
+
+    # Plot 4: Class Distribution — Train vs Test
+    train_counts = [y_train.value_counts().get(c, 0) for c in classes]
+    test_counts = [y_test.value_counts().get(c, 0) for c in classes]
+
+    x_dist = np.arange(len(classes))
+    width_dist = 0.35
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(x_dist - width_dist / 2, train_counts, width_dist, label="Train", color="#4c72b0")
+    plt.bar(x_dist + width_dist / 2, test_counts, width_dist, label="Test", color="#dd8452")
+    plt.xlabel("Class")
+    plt.ylabel("Count")
+    plt.title("Class Distribution — Train vs Test")
+    plt.xticks(x_dist, classes)
+    plt.legend()
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "class_distribution.png"), dpi=150)
+    plt.close()
+    print("[PLOT] Saved plots/class_distribution.png")
+
+    # 11. Compute predictions, confidence scores, and review flags for ALL rows
     print("\n[DB] Predicting all rows, computing confidence scores and review flags ...")
     all_predictions = clf.predict(X)
     probabilities = clf.predict_proba(X)
@@ -352,7 +453,7 @@ def main():
 
     conn.close()
 
-    # 10. Final summary statistics
+    # 12. Final summary statistics
     review_count = int(np.sum(needs_review_flags))
     avg_confidence = float(np.mean(confidence_scores))
     total_rows = len(all_predictions)

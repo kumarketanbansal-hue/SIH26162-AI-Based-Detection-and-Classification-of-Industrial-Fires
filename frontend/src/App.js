@@ -72,6 +72,18 @@ function formatDateDisplay(dateStr, timeStr) {
   return `${dateStr}${formattedTime}`;
 }
 
+function isFlaggedForReview(needsReview) {
+  return needsReview === true || needsReview === 'true' || needsReview === 1;
+}
+
+function formatConfidenceScore(score) {
+  if (score === null || score === undefined || score === '' || isNaN(score)) return 'N/A';
+  const num = parseFloat(score);
+  if (isNaN(num)) return 'N/A';
+  const percent = num <= 1.0 ? Math.round(num * 100) : Math.round(num);
+  return `${percent}%`;
+}
+
 // Custom Marker Cluster Icon Generator
 const createClusterCustomIcon = (cluster) => {
   const count = cluster.getChildCount();
@@ -82,21 +94,38 @@ const createClusterCustomIcon = (cluster) => {
     clusterSize = 'medium';
   }
 
-  // Check if any child marker represents an unplanned industrial fire
+  // Check if any child marker represents an unplanned industrial fire or needs_review
   const markers = cluster.getAllChildMarkers();
   let hasHighRisk = false;
+  let hasNeedsReview = false;
+
   for (let i = 0; i < markers.length; i++) {
-    const opts = markers[i].options;
-    if (opts?.fillColor === '#dc2626' || opts?.pathOptions?.fillColor === '#dc2626') {
+    const opts = markers[i].options || {};
+    const pathOpts = opts.pathOptions || opts;
+
+    if (pathOpts.fillColor === '#dc2626' || opts.fillColor === '#dc2626') {
       hasHighRisk = true;
-      break;
     }
+    if (
+      opts.needsReview ||
+      pathOpts.color === '#facc15' ||
+      opts.color === '#facc15' ||
+      pathOpts.dashArray === '4' ||
+      pathOpts.dashArray === 4
+    ) {
+      hasNeedsReview = true;
+    }
+
+    if (hasHighRisk && hasNeedsReview) break;
   }
 
   const formattedCount = count > 9999 ? `${(count / 1000).toFixed(1)}k` : count.toLocaleString();
 
   return L.divIcon({
-    html: `<div class="cluster-badge cluster-${clusterSize} ${hasHighRisk ? 'cluster-has-fire' : ''}"><span>${formattedCount}</span></div>`,
+    html: `<div class="cluster-badge cluster-${clusterSize} ${hasHighRisk ? 'cluster-has-fire' : ''} ${hasNeedsReview ? 'cluster-has-review' : ''}">
+      <span>${formattedCount}</span>
+      ${hasNeedsReview ? '<span class="cluster-review-indicator" title="Contains detections flagged for review">⚠️</span>' : ''}
+    </div>`,
     className: 'custom-cluster-wrapper',
     iconSize: L.point(40, 40, true),
   });
@@ -210,14 +239,22 @@ function App() {
     setLoading(false);
   };
 
-  // Filtered thermal points based on category filter
+  // Filtered thermal points based on category or review filter
   const filteredPoints = useMemo(() => {
     if (activeCategoryFilter === 'ALL') return points;
+    if (activeCategoryFilter === 'NEEDS_REVIEW') {
+      return points.filter((feature) => isFlaggedForReview(feature.properties?.needs_review));
+    }
     return points.filter((feature) => {
       const cls = feature.properties?.classification || 'Unclassified';
       return cls.toLowerCase() === activeCategoryFilter.toLowerCase();
     });
   }, [points, activeCategoryFilter]);
+
+  // Total count of points flagged for review across loaded dataset
+  const flaggedReviewCount = useMemo(() => {
+    return points.filter((pt) => isFlaggedForReview(pt.properties?.needs_review)).length;
+  }, [points]);
 
   // Memoized thermal point CircleMarkers for MarkerClusterGroup to prevent rebuilds on zoom/pan
   const renderedMarkers = useMemo(() => {
@@ -230,18 +267,21 @@ function App() {
         return null;
       }
 
+      const isReview = isFlaggedForReview(props.needs_review);
       const markerColor = getCategoryColor(props.classification);
 
       return (
         <CircleMarker
           key={`thermal-${props.id || idx}`}
           center={[lat, lng]}
-          radius={6}
+          radius={isReview ? 7 : 6}
+          needsReview={isReview}
           pathOptions={{
             fillColor: markerColor,
             fillOpacity: 0.9,
-            color: '#ffffff',
-            weight: 1.5,
+            color: isReview ? '#facc15' : '#ffffff',
+            weight: isReview ? 3 : 1.5,
+            dashArray: isReview ? '4' : undefined,
           }}
           eventHandlers={{
             click: () => setSelectedPoint(props),
@@ -257,6 +297,13 @@ function App() {
               >
                 {props.classification || 'Thermal Detection'}
               </div>
+
+              {isReview && (
+                <div className="popup-review-banner">
+                  <span className="popup-review-icon">⚠️</span>
+                  <span className="popup-review-text">FLAGGED FOR ANALYST REVIEW</span>
+                </div>
+              )}
 
               <div className="popup-content">
                 <div className="popup-metric-grid">
@@ -276,6 +323,19 @@ function App() {
 
                   <div className="popup-metric">
                     <span className="metric-title">Confidence</span>
+                    <span
+                      className="metric-data highlight"
+                      style={{
+                        color: isReview ? '#facc15' : '#38bdf8',
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      {formatConfidenceScore(props.confidence_score)}
+                    </span>
+                  </div>
+
+                  <div className="popup-metric">
+                    <span className="metric-title">VIIRS Quality</span>
                     <span className="metric-data capitalize">
                       {props.confidence || 'Nominal'}
                     </span>
@@ -390,7 +450,7 @@ function App() {
           </p>
         </div>
 
-        {/* Global Stats Banner */}
+        {/* Global Stats Banner & Review Stat Card */}
         <div className="stats-overview-card">
           <div className="stat-item main-stat">
             <span className="stat-label">Total Active Detections</span>
@@ -420,6 +480,35 @@ function App() {
                       minute: '2-digit',
                     })
                   : 'N/A'}
+              </span>
+            </div>
+          </div>
+
+          {/* Flagged for Review Interactive Stat Card */}
+          <div
+            className={`stat-card-review ${activeCategoryFilter === 'NEEDS_REVIEW' ? 'selected' : ''}`}
+            onClick={() =>
+              setActiveCategoryFilter(activeCategoryFilter === 'NEEDS_REVIEW' ? 'ALL' : 'NEEDS_REVIEW')
+            }
+            role="button"
+            tabIndex={0}
+            title="Click to filter map to only points flagged for review"
+          >
+            <div className="review-card-top">
+              <div className="review-title-wrap">
+                <span className="review-badge-icon">⚠️</span>
+                <span className="review-title">Flagged for Review</span>
+              </div>
+              <span className="review-count">
+                {loading ? '...' : flaggedReviewCount.toLocaleString()}
+              </span>
+            </div>
+            <div className="review-meta-row">
+              <span className="review-meta-text">
+                {points.length ? Math.round((flaggedReviewCount / points.length) * 100) : 0}% of loaded dataset
+              </span>
+              <span className="review-filter-hint">
+                {activeCategoryFilter === 'NEEDS_REVIEW' ? 'Active Filter (Click to Reset)' : 'Click to Filter'}
               </span>
             </div>
           </div>
@@ -496,7 +585,9 @@ function App() {
         {/* Classification Breakdown Cards */}
         <div className="categories-section">
           <div className="section-header-row">
-            <label className="section-label">Classification Breakdown</label>
+            <label className="section-label">
+              {activeCategoryFilter === 'NEEDS_REVIEW' ? 'Filtered: Flagged for Review' : 'Classification Breakdown'}
+            </label>
             {activeCategoryFilter !== 'ALL' && (
               <button
                 className="reset-filter-link"
@@ -576,6 +667,11 @@ function App() {
                 ×
               </button>
             </div>
+            {isFlaggedForReview(selectedPoint.needs_review) && (
+              <div className="inspector-review-flag">
+                ⚠️ FLAGGED FOR ANALYST REVIEW
+              </div>
+            )}
             <div className="inspector-body">
               <div className="inspector-row">
                 <span>Class:</span>
@@ -585,6 +681,16 @@ function App() {
                   }}
                 >
                   {selectedPoint.classification || 'Unclassified'}
+                </strong>
+              </div>
+              <div className="inspector-row">
+                <span>Confidence:</span>
+                <strong
+                  style={{
+                    color: isFlaggedForReview(selectedPoint.needs_review) ? '#facc15' : '#38bdf8',
+                  }}
+                >
+                  {formatConfidenceScore(selectedPoint.confidence_score)}
                 </strong>
               </div>
               <div className="inspector-row">
@@ -773,6 +879,12 @@ function App() {
                 <span className="legend-label">{config.label}</span>
               </div>
             ))}
+
+            {/* Review Flag Highlight */}
+            <div className="legend-row">
+              <span className="legend-bullet-review"></span>
+              <span className="legend-label">Flagged for Review</span>
+            </div>
 
             {/* Optional Layer Swatches when toggled */}
             {showIndustrialZones && (
