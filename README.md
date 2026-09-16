@@ -126,7 +126,7 @@ Every alert email contains a secure, one-click acknowledgment link (routed via a
 | **Backend & Alerting** | FastAPI, Uvicorn, psycopg2, smtplib, ngrok | Async REST API, GeoJSON serialization, 3-tier SMTP email alerting, public tunnel for email acknowledgment |
 | **Frontend UI** | React 19, Leaflet, React-Leaflet, MarkerCluster | High-performance interactive map visualization, telemetry analytics, incident simulation controls |
 | **Containerization** | Docker, Docker Compose | Reproducible local spatial database environment with pre-seeded data |
-| **Cloud Hosting** | Vercel (Frontend), Render (FastAPI Web Service & Scheduled Cron), Supabase (PostgreSQL + PostGIS Database) | Scalable production hosting with decoupled compute and database tiers |
+| **Cloud Hosting** | Vercel (Frontend), Render (FastAPI Web Service), Supabase (PostgreSQL + PostGIS Database) | Scalable production hosting with decoupled compute and database tiers |
 
 ---
 
@@ -137,7 +137,7 @@ The production environment is deployed across modern cloud platforms:
 - **Frontend (Vercel)**: Hosted at [sih-26162-ai-based-detection-and-cl.vercel.app](https://sih-26162-ai-based-detection-and-cl.vercel.app/) — continuously built and deployed from the `frontend/` directory on every push to `main`.
 - **Backend API (Render)**: Hosted at [sih26162-ai-based-detection-and.onrender.com](https://sih26162-ai-based-detection-and.onrender.com) — FastAPI web service connected to the Supabase database instance, providing automated OpenAPI documentation at `/docs`.
 - **Database (Supabase PostgreSQL + PostGIS)**: Cloud-managed PostgreSQL instance with PostGIS extension enabled on Supabase, pre-seeded with 100,000+ thermal records, nationwide industrial zones, power plant infrastructure, and sovereign India boundary polygons.
-- **Automated Data Sync (Render Cron Job)**: Scheduled runner executing `fetch_firms.py` (ingestion only) **every 6 hours** to fetch fresh NASA FIRMS detections, filter them against India's boundary, and ingest them into the live Supabase database.
+- **Scheduled Data Refresh (Local Only)**: An automated 6-hour refresh cycle is implemented via `pipeline.sh` and configured through a local cron job (WSL crontab), running ingestion → spatial feature engineering → classification in sequence. This runs on a local development machine; the hosted cloud deployment currently serves a static seeded snapshot, as scheduled cron execution on Render requires a paid plan. Automating this in the cloud is a documented next step.
 
 ---
 
