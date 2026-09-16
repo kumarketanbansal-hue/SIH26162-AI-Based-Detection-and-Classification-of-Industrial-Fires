@@ -20,6 +20,8 @@ import sys
 import psycopg2
 from dotenv import load_dotenv
 
+load_dotenv()
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -27,9 +29,10 @@ from dotenv import load_dotenv
 CSV_FILE = os.path.join(os.path.dirname(__file__), "database_IND.csv")
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = 5432
-DB_NAME = "sih_fire_db"
-DB_USER = "postgres"
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
+DB_NAME = os.getenv("DB_NAME", "sih_fire_db")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_SSLMODE = os.getenv("DB_SSLMODE", "prefer")
 
 # ---------------------------------------------------------------------------
 # DDL
@@ -71,6 +74,7 @@ def get_connection(db_password):
         dbname=DB_NAME,
         user=DB_USER,
         password=db_password,
+        sslmode=DB_SSLMODE,
     )
 
 
@@ -103,11 +107,28 @@ def insert_rows(cur, rows):
 
     Geometry is built from longitude/latitude using ST_SetSRID + ST_MakePoint.
     Rows with missing or invalid coordinates are skipped.
+    Duplicates are identified by (name, capacity_mw).
 
-    Returns (inserted_count, skipped_count).
+    Returns (inserted_count, duplicates_count).
     """
-    inserted = 0
-    skipped  = 0
+    inserted   = 0
+    duplicates = 0
+
+    # Unique constraint for duplicate detection (created once, idempotently)
+    cur.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'uq_power_plants_name_capacity'
+            ) THEN
+                ALTER TABLE power_plants
+                ADD CONSTRAINT uq_power_plants_name_capacity
+                UNIQUE (name, capacity_mw);
+            END IF;
+        END
+        $$;
+    """)
 
     insert_sql = """
         INSERT INTO power_plants (name, capacity_mw, primary_fuel, geom)
@@ -117,6 +138,7 @@ def insert_rows(cur, rows):
             %(primary_fuel)s,
             ST_SetSRID(ST_MakePoint(%(longitude)s, %(latitude)s), 4326)
         )
+        ON CONFLICT (name, capacity_mw) DO NOTHING;
     """
 
     for row in rows:
@@ -130,7 +152,6 @@ def insert_rows(cur, rows):
                 f"name={name_val!r}, "
                 f"lat={row.get('latitude')!r}, lon={row.get('longitude')!r}"
             )
-            skipped += 1
             continue
 
         params = {
@@ -142,9 +163,12 @@ def insert_rows(cur, rows):
         }
 
         cur.execute(insert_sql, params)
-        inserted += 1
+        if cur.rowcount == 1:
+            inserted += 1
+        else:
+            duplicates += 1
 
-    return inserted, skipped
+    return inserted, duplicates
 
 
 # ---------------------------------------------------------------------------
@@ -176,14 +200,14 @@ def main():
     with conn:
         with conn.cursor() as cur:
             ensure_table(cur)
-            inserted, skipped = insert_rows(cur, rows)
+            inserted, duplicates = insert_rows(cur, rows)
 
     conn.close()
 
     # 4. Summary
     print("\n-- Ingestion summary ------------------------------------------")
-    print(f"  Rows inserted : {inserted}")
-    print(f"  Rows skipped  : {skipped}")
+    print(f"  New rows inserted         : {inserted}")
+    print(f"  Duplicates skipped        : {duplicates}")
     print("---------------------------------------------------------------")
 
 

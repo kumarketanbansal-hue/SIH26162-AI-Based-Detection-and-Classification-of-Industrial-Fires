@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 
 import os
 import sys
+import time
 
 import joblib
 import numpy as np
@@ -42,9 +43,10 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = 5432
-DB_NAME = "sih_fire_db"
-DB_USER = "postgres"
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
+DB_NAME = os.getenv("DB_NAME", "sih_fire_db")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_SSLMODE = os.getenv("DB_SSLMODE", "prefer")
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.pkl")
 
@@ -89,6 +91,7 @@ def get_connection(db_password):
         dbname=DB_NAME,
         user=DB_USER,
         password=db_password,
+        sslmode=DB_SSLMODE,
     )
 
 
@@ -136,30 +139,44 @@ def ensure_prediction_columns(cur):
 def write_predictions(conn, ids, predictions, confidence_scores, needs_review_flags):
     """
     Bulk-update thermal_points with classification, confidence_score, and needs_review
-    flags for every row.
+    flags for every row using execute_values in a single query.
     """
-    update_sql = """
-        UPDATE thermal_points
-        SET    classification   = %(label)s,
-               confidence_score = %(score)s,
-               needs_review     = %(needs_review)s
-        WHERE  id               = %(id)s;
-    """
-    params = [
-        {
-            "id": int(i),
-            "label": str(lbl),
-            "score": float(score),
-            "needs_review": bool(nr),
-        }
+    data_tuples = [
+        (int(i), str(lbl), float(score), bool(nr))
         for i, lbl, score, nr in zip(ids, predictions, confidence_scores, needs_review_flags)
     ]
 
+    if not data_tuples:
+        print("[DB] No predictions to write back.")
+        return
+
+    update_sql = """
+        UPDATE thermal_points AS tp
+        SET classification = v.classification,
+            confidence_score = v.confidence_score,
+            needs_review = v.needs_review
+        FROM (VALUES %s) AS v(id, classification, confidence_score, needs_review)
+        WHERE tp.id = v.id
+    """
+
+    print(f"[DB] Bulk-writing predictions for {len(data_tuples)} rows via execute_values ...")
+    start_time = time.time()
+
     with conn.cursor() as cur:
         ensure_prediction_columns(cur)
-        cur.executemany(update_sql, params)
+        psycopg2.extras.execute_values(
+            cur,
+            update_sql,
+            data_tuples,
+            page_size=len(data_tuples),
+        )
     conn.commit()
-    print(f"[DB] Wrote classification, confidence scores, and review flags for {len(params)} rows.")
+
+    elapsed = time.time() - start_time
+    print(
+        f"[DB] Wrote classification, confidence scores, and review flags for {len(data_tuples)} rows "
+        f"in {elapsed:.2f}s ({len(data_tuples) / max(elapsed, 0.001):.0f} rows/s)."
+    )
 
 
 # ---------------------------------------------------------------------------

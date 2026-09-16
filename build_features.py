@@ -40,6 +40,7 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_NAME = os.getenv("DB_NAME", "sih_fire_db")
 DB_USER = os.getenv("DB_USER", "postgres")
+DB_SSLMODE = os.getenv("DB_SSLMODE", "prefer")
 
 # ---------------------------------------------------------------------------
 # SQL statements
@@ -135,6 +136,7 @@ def get_connection(db_password):
         dbname=DB_NAME,
         user=DB_USER,
         password=db_password,
+        sslmode=DB_SSLMODE,
     )
 
 

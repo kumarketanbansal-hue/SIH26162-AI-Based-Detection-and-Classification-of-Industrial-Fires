@@ -30,9 +30,10 @@ FIRMS_DAYS   = 5   # Look-back window (FIRMS Area API max = 5)
 FIRMS_SOURCE = "VIIRS_SNPP_NRT"
 
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = 5432
-DB_NAME = "sih_fire_db"
-DB_USER = "postgres"
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
+DB_NAME = os.getenv("DB_NAME", "sih_fire_db")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_SSLMODE = os.getenv("DB_SSLMODE", "prefer")
 
 # CSV columns returned by the FIRMS area API
 FIRMS_COLUMNS = [
@@ -120,6 +121,7 @@ def get_connection(db_password):
         dbname=DB_NAME,
         user=DB_USER,
         password=db_password,
+        sslmode=DB_SSLMODE,
     )
 
 
@@ -145,36 +147,28 @@ def safe_float(value):
 
 def insert_rows(cur, rows):
     """
-    Insert FIRMS rows into thermal_points only if they fall inside India's boundary.
+    Insert FIRMS rows into thermal_points and delete points outside India's boundary.
 
     Duplicates are identified by (latitude, longitude, acq_date, acq_time).
     Returns (inserted_count, duplicate_count, outside_boundary_count).
     """
-    inserted = 0
+    raw_inserted = 0
     duplicates = 0
-    outside_boundary = 0
+
+    # Capture start time before insertion so we can identify points added in this run
+    cur.execute("SELECT NOW();")
+    start_time = cur.fetchone()[0]
 
     insert_sql = """
         INSERT INTO thermal_points
             (latitude, longitude, geom, brightness, frp, confidence,
              acq_date, acq_time, satellite, daynight)
-        SELECT
-            %(latitude)s, %(longitude)s,
-            ST_SetSRID(ST_MakePoint(%(longitude)s, %(latitude)s), 4326),
-            %(brightness)s, %(frp)s, %(confidence)s,
-            %(acq_date)s, %(acq_time)s, %(satellite)s, %(daynight)s
-        WHERE EXISTS (
-            SELECT 1 FROM india_boundary b
-            WHERE ST_Within(ST_SetSRID(ST_MakePoint(%(longitude)s, %(latitude)s), 4326), b.geom)
-        )
+        VALUES
+            (%(latitude)s, %(longitude)s,
+             ST_SetSRID(ST_MakePoint(%(longitude)s, %(latitude)s), 4326),
+             %(brightness)s, %(frp)s, %(confidence)s,
+             %(acq_date)s, %(acq_time)s, %(satellite)s, %(daynight)s)
         ON CONFLICT (latitude, longitude, acq_date, acq_time) DO NOTHING;
-    """
-
-    boundary_check_sql = """
-        SELECT EXISTS (
-            SELECT 1 FROM india_boundary b
-            WHERE ST_Within(ST_SetSRID(ST_MakePoint(%s, %s), 4326), b.geom)
-        );
     """
 
     # Unique constraint for duplicate detection (created once, idempotently)
@@ -199,12 +193,9 @@ def insert_rows(cur, rows):
 
         if lat is None or lon is None:
             print(f"[WARN] Skipping row with invalid coordinates: {row}")
-            outside_boundary += 1
             continue
 
         params = {
-            "lat":        lat,
-            "lon":        lon,
             "latitude":   lat,
             "longitude":  lon,
             "brightness": safe_float(row.get("brightness")),
@@ -218,16 +209,23 @@ def insert_rows(cur, rows):
 
         cur.execute(insert_sql, params)
         if cur.rowcount == 1:
-            inserted += 1
+            raw_inserted += 1
         else:
-            # Determine if point was skipped for being outside boundary or a duplicate
-            cur.execute(boundary_check_sql, (lon, lat))
-            is_inside = cur.fetchone()[0]
-            if not is_inside:
-                outside_boundary += 1
-            else:
-                duplicates += 1
+            duplicates += 1
 
+    # Single batched DELETE for all points from this run that fall outside India's boundary
+    delete_sql = """
+        DELETE FROM thermal_points tp
+        WHERE inserted_at >= %s
+          AND NOT EXISTS (
+              SELECT 1 FROM india_boundary b
+              WHERE ST_Within(tp.geom, b.geom)
+          );
+    """
+    cur.execute(delete_sql, (start_time,))
+    outside_boundary = cur.rowcount
+
+    inserted = raw_inserted - outside_boundary
     return inserted, duplicates, outside_boundary
 
 
