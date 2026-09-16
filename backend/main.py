@@ -546,7 +546,7 @@ async def simulate_incident(payload: Optional[SimulateIncidentRequest] = None):
     Defaults to a random real thermal_points row if not provided.
     Rejects Persistent Industrial Source points with HTTP 400.
     Branches dispatch based on VIIRS detection confidence:
-    - 'l' or 'n' (Low / Nominal): sequential escalation (Tier 0 at 0s, Tier 1 at 30s, Tier 2 at 60s).
+    - 'l' or 'n' (Low / Nominal): sequential escalation (Tier 0 at 0s, Tier 1 at 60s, Tier 2 at 120s).
     - 'h' (High): parallel dispatch (Tier 0, 1, 2 fired simultaneously at 0s).
     """
     target_tp_id = payload.thermal_point_id if payload else None

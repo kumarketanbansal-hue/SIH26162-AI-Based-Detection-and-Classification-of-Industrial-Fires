@@ -77,11 +77,11 @@ export default function SystemInfoModal({ isOpen, onClose }) {
                 <strong className="info-row-val">Local Plant Operator & Emergency SMS/Email</strong>
               </div>
               <div className="system-info-table-row">
-                <span className="info-row-key">Tier 1 (30s)</span>
+                <span className="info-row-key">Tier 1 (60s)</span>
                 <strong className="info-row-val">Safety Supervisor & Zone Fire Marshall</strong>
               </div>
               <div className="system-info-table-row">
-                <span className="info-row-key">Tier 2 (60s)</span>
+                <span className="info-row-key">Tier 2 (120s)</span>
                 <strong className="info-row-val">Emergency Command & Municipal Response</strong>
               </div>
               <div className="system-info-table-row">
